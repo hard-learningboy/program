@@ -1,0 +1,92 @@
+Controller
+AuthorizeController: 注销功能"/logout" 【return "redirect:/"】
+IndexController:①首页“/” ： tag（false） , search （false）, category（默认0） , navLi  【return "index"】index.html ->navLi没用？
+ProfileController：①查看最新通知"/read"("id","status") "unreadcount"未读数  评论点赞，返回【redirect:/question/" + notification.getOutterId()】 评论回复，评论点赞 返回【"redirect:/question/" + questionId;】 关注，返回【"redirect:/people?id="+notification.getOutterId();】
+
+
+
+index.html:导入navbar.html
+	综合，疫情咨询，旅游攻略//?category=0，1---
+navbar.html: 登录：/login
+	    注册：id：register 注册/register
+	   导航：旅游论坛/
+		发现/
+		话题/topic
+		搜索form ， /search=值？ @{/}  ${search}
+		源码，‘NAV’（无用）
+		发帖/publish
+		生活笔记/publishrepository
+		消息图标/profile?action=replies  session.unreadcount:未读信息数，大于0显示
+		1)个人图标：我的主页/profile 退出登入/logout
+		2)登入
+		  注册
+
+
+
+
+
+myenums
+CommentStatus：READ(0,"已读"),
+    	            UN_READ(1,"未读");
+CommentNotificationType：
+    COMMENT_QUESTION(1,"评论了你的帖子"),
+    COMMENT_Like(3,"点赞了你的评论"),
+    COMMENT_REPLY(2,"回复了你的评论"),
+    LIKE_QUESTION(4,"点赞了帖子"),
+    FOLLOWING(5,"关注了"),
+    FOLLOWING_YOU(5,"你")
+CustomizeErrorCode:
+
+dto包：
+QuestionQueryDTO
+    private String tag;
+    private String search;
+    private long beginTime;
+    private long endTime;
+    private Integer category;
+    private Integer pageNo;
+    private Integer pageSize;
+
+ResultTypeDTO
+    private String code;
+    private String message;
+    private Map<String,Object> extend=new HashMap<>();
+errorOf（CustomizeErrorCode｜QuestionErrorEnum｜RepositoryErrorEnum） return ResultTypeDTO
+okOf() [CustomizeErrorCode.OK.getMessage(),CustomizeErrorCode.OK.getCode()]return ResultTypeDTO
+
+全部，点赞最多，月榜，周榜实现：
+getPageBySearch（QuestionQueryDTO）
+QuestionQueryDTO：
+    private String tag;
+    private String search;
+    private long beginTime;
+    private long endTime;
+    private Integer category;
+    private Integer pageNo;
+    private Integer pageSize;
+全部：questionExtMapper.listQuestionWithUserBySearch(questionQueryDTO);
+其他不同方法？
+
+
+问题：
+①只能首页点登录、注册
+②首页轮播图失效。
+③公告栏：index.html:layer.open
+④综合，转疫情咨询时，高亮没有变换。
+⑤搜索完之后只能点击旅游论坛返回首页，搜索之后转到综合，全部，此时点击如查看最多，是全部的数据
+⑥最热标签是根据页面中的标签查询！
+⑦分页功能 失效！！！
+⑧广告位 未添加内容
+⑨数据库 用户表中 bio：简介、location：位置、company：公司、user_type?? 前三个写死，后面作用是？（后台系统？）
+⑩可以自己给自己点赞，自己给自己评论，评论下的评论算一条？还是一个用户只能有一条有效评论？
+11、因为index.html中有加载右侧热门标签，但是现在热门标签的缓存的刷新依赖于TagTask，如何在热门标签修改后返回index.
+html文件时，刷新缓存并回显到页面！
+12、今日未签到时，点击签到时会出现签到成功，然后签到标签失效，但是点击其他页面跳回来或者刷新页面，今天签到标签任然有效
+虽然点击时提示今日已签到
+
+
+https://view.inews.qq.com/g2/getOnsInfo?name=disease_h5
+https://view.inews.qq.com/g2/getOnsInfo?name=wuwei_ww_time_line
+
+https://voice.baidu.com/act/newpneumonia/newpneumonia/?from=osari_aladin_banner#tab0
+https://voice.baidu.com/act/newpneumonia/newpneumonia/?from=osari_aladin_banner#tab1
