@@ -65,7 +65,7 @@
     Question_Category_CANT_EMPTY("4008","帖子分类不能为空");
 ```
 
-##### 3)RepositoryErrorEnum
+#### 3)RepositoryErrorEnum
 
 ```java
 	private String msg;
@@ -98,6 +98,54 @@
 ```java
 NAV,SIDE,HEAD,FOOTER,ITEM
 ```
+
+#### 6）CommentStatus
+
+```java
+private  Integer code;
+private String status;
+
+READ(0,"已读"),
+UN_READ(1,"未读");
+
+ public String getDesc() {
+    return status;
+}
+
+public void setDesc(String desc) {
+    this.status = desc;
+}
+```
+
+### 7）QuestionCategory
+
+```java
+Put_Questions(1,"疫情资讯"),
+Share(2,"旅游攻略"),
+Discuss(3,"寻伴交友"),
+Advise(4,"游玩感悟"),
+Bug(5,"民宿推荐"),
+FOR_JOB(6,"自然风光"),
+NOTICE(7,"奇闻异事"),
+TEACH(8,"路线打听"),
+INTERVIEW(9,"名胜景点");
+
+private Integer value;
+private  String name;
+
+//获取分类名并返回
+public static   String getnameByVal(Integer value){
+    QuestionCategory[] values = QuestionCategory.values();
+    for (Integer i = 0; i < value; i++) {
+        if(values[i].getValue()==value){
+            return values[i].name;
+        }
+    }
+    return "";
+}
+```
+
+
 
 
 
@@ -152,7 +200,7 @@ private Integer category;
 private User user;
 ```
 
-#### 4)QuestionQueryDTO
+#### 4) QuestionQueryDTO
 
 ```java
 private String tag;
@@ -172,6 +220,35 @@ private String sort;
 private User user;
 private String showTime;
 private String typeName;
+```
+
+#### 5）RepositoryQueryDTO
+
+```java
+private String tag;
+private String search;
+private long beginTime;
+private long endTime;
+private Integer category;
+private Integer pageNo;
+private Integer pageSize;
+private Integer userId;
+private String sort;
+```
+
+#### 6）PeopleDetailsInfo
+
+```java
+//我的帖子数
+private Integer questionCount;
+//我关注的人数
+private Integer followCount;
+//粉丝数
+private Integer fanCount;
+//我的收藏
+private Integer collectCount;
+//我的积分
+private Long integral;
 ```
 
 
@@ -211,6 +288,89 @@ private String typeName;
 		//返回布尔值，为真则表示缓存已经有该条数据，表示用户已经签到过了，返回 ResultTypeDTO().okOf().addMsg("sigined","1");
 		//假，即用户未签到过，返回 new ResultTypeDTO().okOf().addMsg("sigined","0");
 ```
+
+#### 2）PublishController
+
+```java
+-GetMapping "/publish"
+    获取数据库topic表信息，存放在map中
+    map.put("topiclist",topicService.listAllTopic());
+//下面该属性没用到navLi
+    map.put("navLi","publish");  
+	返回publish页面
+        
+//html中相关
+    <!--添加或创建话题-->
+   <div th:if="${id==null}" class="topic_wrapper">
+       <label style="float: left;line-height: 30px;" for="bs-example-navbar-collapse-1">添加或创建话题:</label>
+       <div style="display: inline-block" class="box form-group col-lg-3 col-md-2 col-sm-2">
+           <select type="text" class="form-control" id="topic" name="topic">
+               <option th:value="0" selected>默认不选</option>
+               <option th:each="topic:${topiclist}" th:value="${topic.id}" th:text="${topic.title}"></option>
+           </select>
+       </div>
+   </div>
+                   
+-PostMapping "/publish"
+	//帖子修改或新建点击提交，$.post转发到这里
+    title,description,tag,id,category,topic
+    //从session中获取user，验证各类错误
+    question.setCreator(user.getId());
+    question.setUser(user);
+	//保存或更新questionService.saveOrUpdate(question)，返回result
+```
+
+#### 3）ProfileController！
+
+- 作用没搞明白？1
+
+```java
+-"/profile"（参数：@RequestParam(value = "action",required = false) , Map<String, Object> map）
+    从session中获取user，没有则重定向到首页，
+//下面的作用是啥？
+    if("replies".equals(action)){	
+        map.put("action",action);
+    }
+	通过UserExtMapper查找五个属性值【】，封装到PeopleDetailsInfo
+        -帖子数，数据库表question
+        -关注，数据库表follow
+        -粉丝，数据库表follow
+        -收藏，数据库表collect
+        -积分，数据库表integral
+    map("peopleDetails",PeopleDetailsInfo  | "people",user)
+    返回到 个人主页视图profile.html
+-"/loadPeopleData/{action}"(参数：@PathVariable("action") String action，pageSize，pageNo)  //主页帖子 、 收藏 ！！！
+    从session中获取用户
+    //帖子、收藏->返回相应的信息  PageInfo<Question> 再封装到ResultTypeDTO
+    	-QuestionServiceImpl
+        findQuestionsByUserId（）：
+//以一个为例
+        public PageInfo<Question> findQuestionsByUserId(Integer pageNo, Integer pageSize, Integer id) {
+            PageHelper.startPage(pageNo,pageSize);
+            List<Question> list = questionExtMapper.listQuestionWithUserByUserId(id);
+            BuildQuestionTime(list);
+            PageInfo<Question> questionPageInfo = new PageInfo<>(list);
+            //mcx:设置最多连续显示3页，NavigatePages!
+            questionPageInfo.setNavigatePages(3);
+            return questionPageInfo;
+    	}
+        	-BuildQuestionTime“
+                
+            private void BuildQuestionTime(List<Question> questions) {
+                for (Question question : questions) {
+                    Date date = new Date(question.getGmtCreate());
+                    String dateString = simpleDateFormat.format(date);
+                    String time = DateFormateUtil.getTime(dateString);
+                    question.setShowTime(time);
+                    //通过类别获取类别名，并设置
+                    Integer category = question.getCategory();
+                    String typename = QuestionCategory.getnameByVal(category);
+                    question.setTypeName(typename);
+                }
+            }
+```
+
+
 
 
 
@@ -384,6 +544,42 @@ redisTemplate.opsForValue().getAndSet(key, value);
 redisTemplate.delete(key);
 ```
 
+### 6、intercepter
+
+#### 1)SessionInterceptor
+
+```java
+-"preHandle"
+    1)获取广告，并设置到session中
+    2)获取用户登录的cookies，遍历cookie，
+    判断"token".equals(cookie.getName()) 是否为真
+    	-true，token = cookie.getValue()
+    	 findUserByToken(token) 通过token属性来查找"用户"
+    	 查找到用户，就设置到session中
+         通过user.getId()和CommentStatus.UN_READ.getCode() ->相当于'1'这两个属性查找notification,即"未读信息数"
+         查找到的未读信息，设置到session中
+//String token = UUID.randomUUID().toString();
+```
+
+#### 2）WebConfig
+
+```java
+ @Override
+public void addInterceptors(InterceptorRegistry registry) {
+    //sessionInterceptor拦截器对所有的都进行拦截
+    registry.addInterceptor(sessionInterceptor).addPathPatterns("/**");
+    //publishInterceptor拦截器对/publish/请求下的进行拦截
+    registry.addInterceptor(publishInterceptor).addPathPatterns("/publish/*");
+}
+```
+
+#### 3）PublishInterceptor
+
+```java
+-"preHandle"
+    获取session，看是否user用户存在，不存在则跳转到"/"，存在则放行
+```
+
 
 
 
@@ -442,6 +638,45 @@ layer.msg（("test", {time: 2000, icon: 5, shift: 6});
 ```
 
 $.parseJSON
+
+## markdown
+
+```html
+$(function () {
+    var editor = editormd("editor", {
+        path: "/lib/",  // Autoload modules mode, codemirror, marked... dependents libs path
+        width: "100%",
+        placeholder: "此处开始编写您要发布的内容...",
+        emoji: true,
+        taskList: true,
+        flowChart: true,             // 开启流程图支持，默认关闭
+        //sequenceDiagram: true,       // 开启时序/序列图支持，默认关闭,
+        height: "600px",
+        delay: 0,
+        saveHTMLToTextarea: true, // 保存 HTML 到 Textarea
+        toolbarAutoFixed: false,//工具栏自动固定定位的开启与禁用
+        syncScrolling: "single",
+        imageUpload: true,
+        imageFormats: ["jpg", "jpeg", "gif", "png", "bmp", "webp"],
+        imageUploadURL: "/question/fileupload",
+        // theme : "dark",
+        //previewTheme : "dark",
+        //editorTheme : editormd.editorThemes['3024-night'],
+        watch: false,
+    });
+    //选中的类型
+    var select_val = $("#select_val").val();
+    $("#category option[value='" + select_val + "']").attr("selected", "selected");
+})
+```
+
+## jquery序列化
+
+- $("form").serialize()
+
+![image-20210406133318106](C:\Users\FX\AppData\Roaming\Typora\typora-user-images\image-20210406133318106.png)
+
+
 
 ## Api接口调用过程
 
@@ -1142,4 +1377,606 @@ this.redisTemplate.expire(key,getRefreshTime(), TimeUnit.SECONDS);
 ```
 
 ![image-20210402175816753](C:\Users\FX\AppData\Roaming\Typora\typora-user-images\image-20210402175816753.png)
+
+## 问题汇总
+
+### 1、TopicService直接是实现类
+
+### 2、数据表Topic中的talk_count（讨论数）写死了，topic页面，7天，30天是摆设，不能添加话题
+
+- 更正：talk_count有用！，之前是设置值不对应
+
+![image-20210406114905053](C:\Users\FX\AppData\Roaming\Typora\typora-user-images\image-20210406114905053.png)
+
+![image-20210406114608155](C:\Users\FX\AppData\Roaming\Typora\typora-user-images\image-20210406114608155.png)
+
+![image-20210406114726526](C:\Users\FX\AppData\Roaming\Typora\typora-user-images\image-20210406114726526.png)
+
+### 3、帖子标签，不回车问题，多个标签用什么分隔（直接回车生成标签再接着下一个）
+
+###  4、publish.html addTag方法 tagsCache（tagTitle，tags） ，PublishController TagsCache
+
+### 5、没有用户的信息修改页面，昵称，位置，公司，和简介
+
+### 6、自定义设置个人主页超过7条数据翻页，首页/仓库超过16条翻页
+
+### 7、我的通知没有翻页功能，查看通知里的信息后没有返回功能
+
+### 8 、PageInfo.NavigatePages是*页码导航连续显示的页数*的意思
+
+profile.html：主页页面
+
+- 分页导航
+
+```java
+//构建分页导航
+function build_page_nav(data,action) {
+    var page = data.extend.page;
+    //设置当前页
+    //mcx:page.pageNum
+    currentpage = page.pageNum;
+    //设置末页
+    totalpagesize = page.pages;
+    $('.page_info-area').empty();
+    $(".pagination").empty();
+    $('.page_info-area').append("当前第" + page.pageNum + "页,共" + page.pages + "页,共" + page.total + "条记录")
+    //分页导航
+    var nav = $(".pagination");
+    var firstLi = $("<li></li>").append($("<a>首页</a>").attr("href", "#"));
+    var prli = $("<li></li>").append($("<a  aria-label='Previous'><span aria-hidden='true'>&laquo;</span></a>").attr("href", "#"));
+    //首页
+    firstLi.click(function () {
+        to_page(1,action);
+    });
+    //上一页
+    prli.click(function () {
+        var target = page.pageNum - 1;
+        target = target == 0 ? 1 : target;
+        to_page(target,action);
+    })
+    var lastLi = $("<li></li>").append($("<a>末页</a>").attr("href", "#"));
+    var nextli = $("<li></li>").append($("<a  aria-label='Next'><span aria-hidden='true'>&raquo;</span></a>").attr("href", "#"));
+    //末页
+    lastLi.click(function () {
+        //alert("转到:"+page.pages)
+        to_page(page.pages,action);
+    })
+    //下一页
+    nextli.click(function () {
+        var target = page.pageNum + 1;
+        target = target < page.pages ? target : page.pages;
+        to_page(target,action);
+    })
+    //mcx:自己添加 首页
+    nav.append(firstLi);
+
+
+    nav.append(prli);
+
+    $.each(data.extend.page.navigatepageNums, function (index, item) {
+        var li = $("<li></li>").append($("<a>" + item + "</a>").attr("href", "#"));
+        if (data.extend.page.pageNum == item) {
+            li.addClass("active");
+        }
+        //点击翻页
+        li.click(function () {
+            $(".pagination>li").removeClass("active");
+            $(this).addClass("active");
+            to_page(item,action);
+            return false;
+        })
+        nav.append(li);
+    })
+    nav.append(nextli);
+
+    //mcx:末页
+    nav.append(lastLi);
+
+}
+```
+
+
+
+```html
+<input type="hidden" id="profile_action" th:value="${action}">
+```
+
+- build_page_nav来源：to_page
+
+![image-20210406153539573](C:\Users\FX\AppData\Roaming\Typora\typora-user-images\image-20210406153539573.png)
+
+- to_page来源：被多个调用 
+
+  - 1）$(".nav_list li").click()：作用是移除上一个的acitve属性，给**新的跳转页active属性**，同时更新查找**当前跳转的显示页的id名赋值给action属性**，通过**action判断是哪个页面，执行相应的方法**
+
+  ![image-20210406153719114](C:\Users\FX\AppData\Roaming\Typora\typora-user-images\image-20210406153719114.png)
+
+  action默认为"questions"，因为进入我的主页默认是显示"我的贴子"
+
+  <ul class="nav_list nav nav-pills">
+      <li role="presentation" class="active"> <a id="questions">我的帖子</a></li>
+      <li role="presentation"> <a id="collects">我的收藏</a></li>
+      <li role="presentation"> <a id="replies">我的通知</a></li>
+      <li role="presentation"> <a id="follows">我的关注</a></li>
+      <li role="presentation"> <a id="fans">我的粉丝</a></li>
+      <li role="presentation"> <a href="/RepositoryList" >我的生活笔记</a></li>
+  </ul>
+
+  - 2）刚进入时运行
+
+  ```html
+  <*修改：感觉可缩略*>
+  $(function () {
+      //总记录数
+      var totalpagesize;
+      //当前页
+      var currentpage;
+      var action="questions";
+  
+      if($("#profile_action").val()!=null&& $("#profile_action").val()!=""){
+          action=$("#profile_action").val();
+      }
+  <*下面两行语句有何作用？删掉好像无区别*>
+      //到第几页,默认到第一页
+      $(".nav_list li").removeClass("active");
+      $("#"+action+"").parent().addClass("active");
+      if(action=="follows"){
+          //加载我的关注
+          loadMyFollows();
+          return;
+      }else if(action=="replies") {
+          loadMyReplies()
+          return;
+      }
+      to_page(1,action);
+  });
+  ```
+
+  
+
+  - 3）
+
+
+
+
+
+
+
+- 2）
+
+
+
+通知实现导航栏！
+
+```java
+loadMyReplies
+    
+    
+//我的通知
+function loadMyReplies() {
+    $.get("/loadMyReplies",{"time":new Date()},function (data) {
+        bulid_MyReplies_List(data);
+        //mcx:新增
+        build_page_nav(data,action);
+    })
+}
+
+@GetMapping("/loadMyReplies")
+@ResponseBody
+//15->6
+public ResultTypeDTO loadMyReplies(@RequestParam(name = "pageSize", defaultValue = "6") Integer pageSize,
+                                   @RequestParam(name = "pageNo", defaultValue = "1") Integer pageNo, HttpServletRequest request) {
+    //获取通知信息
+    User user = (User) request.getSession().getAttribute("user");
+    if(user!=null){
+        List<NotificationDTO> notificationDTOPageInfo = notificationService.list(pageNo, pageSize, user.getId());
+        return new ResultTypeDTO().okOf().addMsg("notification", notificationDTOPageInfo);
+    }
+    return null;
+}
+
+ @GetMapping("/loadPeopleData/{action}")
+@ResponseBody
+public ResultTypeDTO loadPeopleData(@PathVariable("action") String action, Map<String, Object> map, HttpServletRequest request,
+                                    @RequestParam(name = "pageSize", defaultValue = "7") Integer pageSize,
+                                    @RequestParam(name = "pageNo", defaultValue = "1") Integer pageNo) {
+    User user = (User) request.getSession().getAttribute("user");
+    if ("questions".equals(action)) {
+        PageInfo<Question> myquestionPageInfo = questionService.findQuestionsByUserId(pageNo, pageSize, user.getId());
+        //获取通知信息
+        return new ResultTypeDTO().okOf().addMsg("page", myquestionPageInfo);
+    }
+
+
+    //我的收藏
+    if ("collects".equals(action)) {
+        PageInfo<Question> questionPageInfo = questionService.getCollectPage(pageNo, pageSize, user.getId());
+        return new ResultTypeDTO().okOf().addMsg("page", questionPageInfo);
+    }
+    if (!"follows".equals(action) && !"questions".equals(action) && !"replies".equals(action) && !"collects".equals(action)) {
+        throw new CustomizeException(CustomizeErrorCode.PAGE_NOT_FOUNT);
+    }
+    //map.put("unreadcount", unreadcount);
+
+    return null;
+}
+
+
+//到帖子页第几页
+function to_page(pageno,action) {
+    //加载完成之后,发送请求到服务器,拿到jason数据,构建列表数据
+    var url = "/loadPeopleData/"+action;
+    $.ajax({
+        type: "GET",
+        url: url,
+        data: {
+            "pageNo": pageno,
+            //mcx:pageSize:15->8
+            "pageSize": 7,
+            contentType: "application/json;charset=UTF-8"
+        },
+        beforeSend: function () {
+            loadingIndex = layer.msg('加载数据~~', {icon: 16});
+        },
+        success: function (data) {
+            layer.close(loadingIndex);
+            if (data.code == "1000") {
+                if(data.extend.page.total>0){
+                    //构建帖子列表信息
+                    build_question_list(data,action);
+                    //构建分页信息
+                    build_page_nav(data,action);
+                }else{
+
+                }
+                $("html,body").animate({scrollTop: 0}, 0);//回到顶端
+            } else {
+                layer.msg(data.extend.msg, {time: 2000, icon: 5, shift: 6}, function () {
+                });
+            }
+        }
+    });
+
+}
+
+function build_question_list(data,action) {
+    //清空
+    $("#my_data_wrapper").empty();
+    var questions = data.extend.page.list;
+    $.each(questions, function (index, item) {
+        var question = $("<div id='question_"+item.id+"'  class=\"question media\">\n" +
+            "  <div class=\"  media-left \">\n" +
+            "    <a href=\"/people?id=" + item.creator + "\">\n" +
+            "      <img style='width: 45px;margin-right: 20px;' class='img-rounded' src=\" " + item.user.avatarUrl + " \" alt=\"...\">\n" +
+            "    </a>\n" +
+            "  </div>\n" +
+            "  <div class=\"media-body\">\n" +
+            "    <a  href='/question/" + item.id + "' class=\"media-heading question_title\">" + item.title + "</a>\n" +
+            "  <br>  <span style=\"font-size: 12px;\">\n" +
+            "                         <span class='question_type_tag'>" + item.typeName + "</span> • \n" +
+            "                  "+item.user.name+"  •  <span style=\"font-size: 11px;\" class=\"iconfont icon-pinglun1\">" + item.commentCount + "</span>人评论 •\n" +
+            "                     <span><small style='font-size: 11px;' class='iconfont icon-liulan1'></small>" + item.viewCount + "</span>次浏览 •\n" +
+            "                        <span>" + item.likeCount + "</span>人点赞 •\n" +
+            "                        发布于:<spanid=\"publish_time\"><span id='clock' class='iconfont icon-zuijingengxin' ></span>" + item.showTime + "</span>\n" +
+            "            </span>\n" +
+            "    <span style=\"float: right;color: #999999;font-size: 10px !important;\">\n" +
+            "      <small class=\"\">" +
+            "</small>\n" +
+            "  </div>\n" +
+            "</div>");
+        if(action=="questions"){
+            $("<div class='question_btn_wrapper' style='font-size: 11px !important;' ><a  style='color: #777 !important;' class='glyphicon glyphicon-pencil' href='/publish/"+item.id+"'>编辑</a>&nbsp;&nbsp;&nbsp;&nbsp;\n" +
+                "<a style='color: #777 !important;' class='glyphicon glyphicon-trash' onclick='deleteQuestionById("+item.id+")'>删除</a></div>").appendTo(question);
+        }
+        question.appendTo("#my_data_wrapper");
+
+    })
+}
+
+function bulid_MyReplies_List(data) {
+    $("#my_data_wrapper").empty();
+    $('.page_info-area').empty();
+    $(".pagination").empty();
+    var notification = data.extend.notification;
+    $.each(notification, function (index, item) {
+        var n=$("<div id='n_"+item.id+"' class=\"panel panel-default\">\n" +
+            "                        <div class=\"panel-body\">\n" +
+            "                            <img width=\"30\" class=\"img-rounded\" src=\""+item.notifier.avatarUrl+"\">\n" +
+            "                            "+item.notifier.name+"\n" +
+            "                            <small>\n" +
+            "                                "+item.commentNotificationType+":\n" +
+            "                            </small>\n" +
+            "                            <span style=\"float: right;\">\n" +
+            "                                <span><span id='n_status' class=\""+item.statusClass+"\">"+item.statusMsg+"</span></span>\n" +
+            "                            </span>\n" +
+            "                            \n" +
+            "                            <br>\n" +
+            "                            <small style=\"float: right;cursor:pointer; font-size: 14px;\" class=\"iconfont icon-shanchu2\">\n" +
+            "                                <a onclick='deleteNotificationById("+item.id+")'>删除</a>\n" +
+            "                            </small>\n" +
+            "\n" +
+            "                            <small>\n" +
+            "                                <!--回复帖子通知-->\n" +
+            "                                <a href=\"/read/?id="+item.id+"&amp;status="+item.status+"\">"+item.msgTitle+"</a>\n" +
+            "                                <!--回复评论通知-->\n" +
+            "                                \n" +
+            "                                <!--点赞评论通知-->\n" +
+            "                                \n" +
+            "                                <!--点赞帖子通知-->\n" +
+            "                                \n" +
+            "                                <!--关注通知-->\n" +
+            "                                \n" +
+            "\n" +
+            "                            </small>\n" +
+            "\n" +
+            "                            <span style=\"color:#303030;float:right;font-size:12px;margin-right: 10px;\">"+item.showTime+"</span>\n" +
+            "                        </div>\n" +
+            "\n" +
+            "                    </div>");
+        n.appendTo("#my_data_wrapper");
+    })
+    if(notification.length!=0){
+        var btns=$(" <div class=\"btn_wrapper\" style=''>\n" +
+            "            <a onclick='readAll()' class=\"btn btn-success btn-sm\">标为已读</a>\n" +
+            "            <a onclick='deleteRead()' class=\"btn btn-danger btn-sm\">删除已读</a>\n" +
+            "        </div>");
+        btns.appendTo("#my_data_wrapper");
+    }else{
+        var info=$("<div class='info_tips text-center'style='margin-top: 40px;color: #999;'>您暂时还没有任何通知~</div>")
+        info.appendTo("#my_data_wrapper");
+    }
+}
+
+public PageInfo<Question> findQuestionsByUserId(Integer pageNo, Integer pageSize, Integer id) {
+    PageHelper.startPage(pageNo,pageSize);
+    List<Question> list = questionExtMapper.listQuestionWithUserByUserId(id);
+    BuildQuestionTime(list);
+    PageInfo<Question> questionPageInfo = new PageInfo<>(list);
+    //mcx:设置最多连续显示3页，NavigatePages!
+    questionPageInfo.setNavigatePages(3);
+    return questionPageInfo;
+}
+```
+
+pageinfo只对一次sql语句有效解决
+
+1、NotificationServiceImpl
+
+```java
+ @Override
+public PageInfo<NotificationDTO> list(Integer pageNo, Integer pageSize, Integer id) {
+    NotificationExample example = new NotificationExample();
+    NotificationExample.Criteria criteria = example.createCriteria();
+    criteria.andReceiverEqualTo((long) id);
+    //不选出自己评论自己的信息
+    criteria.andNotifierNotEqualTo((long) id);
+    example.setOrderByClause("gmt_create desc");
+    //mcx:这里只能对第一次sql有效，但是下面还有sql，可能是这个原因！！！
+    PageHelper.startPage(pageNo, pageSize);
+    List<Notification> notifications = notificationMapper.selectByExample(example);
+    PageInfo<Notification> pageInfo = new PageInfo<>(notifications);
+//        pageInfo.setNavigatePages(5);
+//        pageInfo.setNavigatePages(5);
+    if (notifications.size() > 0) {
+        List<NotificationDTO> notificationDTOlist = new ArrayList<>();
+        for (Notification notification : notifications) {
+
+            if (notification.getType() == CommentNotificationType.COMMENT_QUESTION.getCode()) {
+                NotificationDTO<Question> notificationDTO = new NotificationDTO();
+                Long notifier = notification.getNotifier();
+                int notfiterId = notifier.intValue();
+                User user = userMapper.selectByPrimaryKey(notfiterId);
+
+                //封装信息
+                CreateNotificationDTOCommentQuestion(notificationDTOlist, notification, notificationDTO, user);
+            } else if (notification.getType() == CommentNotificationType.COMMENT_REPLY.getCode()) {
+                NotificationDTO<Comment> notificationDTO = new NotificationDTO();
+                Long notifier = notification.getNotifier();
+                int notfiterId = notifier.intValue();
+                User user = userMapper.selectByPrimaryKey(notfiterId);
+                //封装信息
+                CreateNotificationDTOCommentReply(notificationDTOlist, notification, notificationDTO, user);
+            } else if (notification.getType() == CommentNotificationType.COMMENT_Like.getCode()) {
+                NotificationDTO<Comment> notificationDTO = new NotificationDTO();
+                Long notifier = notification.getNotifier();
+                int notfiterId = notifier.intValue();
+                User user = userMapper.selectByPrimaryKey(notfiterId);
+                CreateNotificationDTOCommentLike(notificationDTOlist, notification, notificationDTO, user);
+            } else if (notification.getType() == CommentNotificationType.LIKE_QUESTION.getCode()) {
+                NotificationDTO<Question> notificationDTO = new NotificationDTO();
+                Long notifier = notification.getNotifier();
+                int notfiterId = notifier.intValue();
+                User user = userMapper.selectByPrimaryKey(notfiterId);
+                CreateNotificationDTOQuestionLike(notificationDTOlist, notification, notificationDTO, user);
+            } else if (notification.getType() == CommentNotificationType.FOLLOWING.getCode()) {
+                NotificationDTO<User> notificationDTO = new NotificationDTO();
+                Long notifier = notification.getNotifier();
+                int notfiterId = notifier.intValue();
+                User user = userMapper.selectByPrimaryKey(notfiterId);
+                CreateNotificationDTOFollowing(notificationDTOlist, notification, notificationDTO, user);
+            }
+
+        }
+
+        //格式化时间
+        BuildNotificationTime(notificationDTOlist);
+        //mcx:添加了下面这行
+        PageInfo<NotificationDTO> notificationDTOlist1 = new PageInfo<>(notificationDTOlist);
+        notificationDTOlist1.setPageNum(pageInfo.getPageNum());//pageInfo.getPageNum()
+        notificationDTOlist1.setPageSize(pageInfo.getPageSize());//pageInfo.getPageSize()
+        notificationDTOlist1.setTotal(pageInfo.getTotal());//pageInfo.getTotal()
+        notificationDTOlist1.setPages(pageInfo.getPages());
+//            notificationDTOlist1.setNavigatePages(pageInfo.getNavigatePages());
+        notificationDTOlist1.setNavigatepageNums(pageInfo.getNavigatepageNums());
+//            notificationDTOlist1.setNavigatePages(5);
+        return notificationDTOlist1;
+    }
+    return new PageInfo<>();
+}
+```
+
+2、ProfileController
+
+```java
+@GetMapping("/loadMyReplies")
+@ResponseBody
+//15->6
+public ResultTypeDTO loadMyReplies(@RequestParam(name = "pageSize", defaultValue = "5") Integer pageSize,
+                                   @RequestParam(name = "pageNo", defaultValue = "1") Integer pageNo, HttpServletRequest request) {
+    //获取通知信息
+    User user = (User) request.getSession().getAttribute("user");
+    if(user!=null){
+//            List<NotificationDTO> notificationDTOPageInfo = notificationService.list(pageNo, pageSize, user.getId());
+        PageInfo<NotificationDTO> notificationDTOPageInfo = notificationService.list(pageNo, pageSize, user.getId());
+        return new ResultTypeDTO().okOf().addMsg("notification", notificationDTOPageInfo);
+    }
+    return null;
+}
+```
+
+3、profile.html
+
+```html
+//mcx:新建导航分页
+function build_page_nav1(data) {
+    console.log("测试进来了新的导航分页");
+    var page = data.extend.notification;
+    //设置当前页
+    //mcx:page.pageNum
+    currentpage = page.pageNum;
+    //设置末页
+    totalpagesize = page.pages;
+    $('.page_info-area').empty();
+    $(".pagination").empty();
+    $('.page_info-area').append("当前第" + page.pageNum + "页,共" + page.pages + "页,共" + page.total + "条记录")
+    //分页导航
+    var nav = $(".pagination");
+    var firstLi = $("<li></li>").append($("<a>首页</a>").attr("href", "#"));
+    var prli = $("<li></li>").append($("<a  aria-label='Previous'><span aria-hidden='true'>&laquo;</span></a>").attr("href", "#"));
+    //首页
+    firstLi.click(function () {
+        // to_page(1,action);
+        loadMyReplies(1);
+    });
+    //上一页
+    prli.click(function () {
+        var target = page.pageNum - 1;
+        target = target == 0 ? 1 : target;
+        // to_page(target,action);
+        loadMyReplies(target);
+    })
+    var lastLi = $("<li></li>").append($("<a>末页</a>").attr("href", "#"));
+    var nextli = $("<li></li>").append($("<a  aria-label='Next'><span aria-hidden='true'>&raquo;</span></a>").attr("href", "#"));
+    //末页
+    lastLi.click(function () {
+        //alert("转到:"+page.pages)
+        // to_page(page.pages,action);
+        loadMyReplies(page.pages);
+    })
+    //下一页
+    nextli.click(function () {
+        var target = page.pageNum + 1;
+        target = target < page.pages ? target : page.pages;
+        // to_page(target,action);
+        loadMyReplies(target);
+    })
+    //mcx:自己添加 首页
+    nav.append(firstLi);
+
+
+    nav.append(prli);
+
+    $.each(data.extend.notification.navigatepageNums, function (index, item) {
+        var li = $("<li></li>").append($("<a>" + item + "</a>").attr("href", "#"));
+        if (data.extend.notification.pageNum == item) {
+            li.addClass("active");
+        }
+        //点击翻页
+        li.click(function () {
+            $(".pagination>li").removeClass("active");
+            $(this).addClass("active");
+            // to_page(item,action);
+            loadMyReplies(item);
+            return false;
+        })
+        nav.append(li);
+    })
+    nav.append(nextli);
+
+    //mcx:末页
+    nav.append(lastLi);
+
+}
+                                    
+                                    
+//mcx:重新生成
+function loadMyReplies(pageno) {
+    $.get("/loadMyReplies",{"time":new Date(),"pageNo":pageno,"pageSize":5},function (data) {
+        console.log(data.extend.notification.total);
+        if(data.extend.notification.total>0){
+            bulid_MyReplies_List(data);
+            //mcx:新增
+            build_page_nav1(data);
+        }
+    })
+}
+            
+            
+//我的通知列表
+function bulid_MyReplies_List(data) {
+    $("#my_data_wrapper").empty();
+    $('.page_info-area').empty();
+    $(".pagination").empty();
+    //mcx:注释
+    // var notification = data.extend.notification;
+    var notification = data.extend.notification.list;
+    $.each(notification, function (index, item) {
+        var n=$("<div id='n_"+item.id+"' class=\"panel panel-default\">\n" +
+            "                        <div class=\"panel-body\">\n" +
+            "                            <img width=\"30\" class=\"img-rounded\" src=\""+item.notifier.avatarUrl+"\">\n" +
+            "                            "+item.notifier.name+"\n" +
+            "                            <small>\n" +
+            "                                "+item.commentNotificationType+":\n" +
+            "                            </small>\n" +
+            "                            <span style=\"float: right;\">\n" +
+            "                                <span><span id='n_status' class=\""+item.statusClass+"\">"+item.statusMsg+"</span></span>\n" +
+            "                            </span>\n" +
+            "                            \n" +
+            "                            <br>\n" +
+            "                            <small style=\"float: right;cursor:pointer; font-size: 14px;\" class=\"iconfont icon-shanchu2\">\n" +
+            "                                <a onclick='deleteNotificationById("+item.id+")'>删除</a>\n" +
+            "                            </small>\n" +
+            "\n" +
+            "                            <small>\n" +
+            "                                <!--回复帖子通知-->\n" +
+            "                                <a href=\"/read/?id="+item.id+"&amp;status="+item.status+"\">"+item.msgTitle+"</a>\n" +
+            "                                <!--回复评论通知-->\n" +
+            "                                \n" +
+            "                                <!--点赞评论通知-->\n" +
+            "                                \n" +
+            "                                <!--点赞帖子通知-->\n" +
+            "                                \n" +
+            "                                <!--关注通知-->\n" +
+            "                                \n" +
+            "\n" +
+            "                            </small>\n" +
+            "\n" +
+            "                            <span style=\"color:#303030;float:right;font-size:12px;margin-right: 10px;\">"+item.showTime+"</span>\n" +
+            "                        </div>\n" +
+            "\n" +
+            "                    </div>");
+        n.appendTo("#my_data_wrapper");
+    })
+    if(notification.length!=0){
+        var btns=$(" <div class=\"btn_wrapper\" style=''>\n" +
+            "            <a onclick='readAll()' class=\"btn btn-success btn-sm\">标为已读</a>\n" +
+            "            <a onclick='deleteRead()' class=\"btn btn-danger btn-sm\">删除已读</a>\n" +
+            "        </div>");
+        btns.appendTo("#my_data_wrapper");
+    }else{
+        var info=$("<div class='info_tips text-center'style='margin-top: 40px;color: #999;'>您暂时还没有任何通知~</div>")
+        info.appendTo("#my_data_wrapper");
+    }
+}
+```
 
