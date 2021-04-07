@@ -117,7 +117,7 @@ public void setDesc(String desc) {
 }
 ```
 
-### 7）QuestionCategory
+#### 7）QuestionCategory
 
 ```java
 Put_Questions(1,"疫情资讯"),
@@ -145,7 +145,31 @@ public static   String getnameByVal(Integer value){
 }
 ```
 
+#### 8）RepositorySortType
 
+```java
+ALL,
+WEEK_HOT,
+MONTH_HOT,
+LIKE_HOT,
+COMMENT_HOT,
+WAIT_COMMENT,
+VIEW_HOT
+```
+
+#### 9）CommentNotificationType
+
+```java
+COMMENT_QUESTION(1,"评论了你的帖子"),
+COMMENT_Like(3,"点赞了你的评论"),
+COMMENT_REPLY(2,"回复了你的评论"),
+LIKE_QUESTION(4,"点赞了帖子"),
+FOLLOWING(5,"关注了"),
+FOLLOWING_YOU(5,"你");
+
+private String name;
+private Integer code;
+```
 
 
 
@@ -251,6 +275,31 @@ private Integer collectCount;
 private Long integral;
 ```
 
+#### 7）NotificationDTO
+
+```java
+private Integer id;
+
+//通知人的姓名
+private User notifier;
+//通知的类型
+private String commentNotificationType;
+//外键信息
+private T item;
+//状态
+private Integer status;
+
+private String showTime;
+
+private String statusMsg;
+
+private String msgTitle;
+
+private String statusClass;
+
+private long gmtCreate;
+```
+
 
 
 
@@ -339,6 +388,7 @@ private Long integral;
         -积分，数据库表integral
     map("peopleDetails",PeopleDetailsInfo  | "people",user)
     返回到 个人主页视图profile.html
+        
 -"/loadPeopleData/{action}"(参数：@PathVariable("action") String action，pageSize，pageNo)  //主页帖子 、 收藏 ！！！
     从session中获取用户
     //帖子、收藏->返回相应的信息  PageInfo<Question> 再封装到ResultTypeDTO
@@ -1398,11 +1448,297 @@ this.redisTemplate.expire(key,getRefreshTime(), TimeUnit.SECONDS);
 
 ### 5、没有用户的信息修改页面，昵称，位置，公司，和简介
 
-### 6、自定义设置个人主页超过7条数据翻页，首页/仓库超过16条翻页
+### ==6==、自定义设置个人主页超过7条数据翻页，首页/仓库超过16条翻页
 
-### 7、我的通知没有翻页功能，查看通知里的信息后没有返回功能
+### 7、我的通知，查看通知里的信息后没有返回功能
 
-### 8 、PageInfo.NavigatePages是*页码导航连续显示的页数*的意思
+### ==8== 、PageInfo.NavigatePages是*页码导航连续显示的页数*的意思
+
+### 9、数据库表comment中type分为1，2【1->直接评论，2->子评论】，子评论不被纳入通知
+
+### 10、文章详情页面，相关帖子和文章结构无实现！评论是否需要分页？【但是文章内容也很长】
+
+![image-20210407091445836](C:\Users\FX\AppData\Roaming\Typora\typora-user-images\image-20210407091445836.png)
+
+### ==11==、我的通知没有翻页功能，将通知的导航栏设置成最多连续显示几页（NavigatePages），目前前端是遍历（NavigatepageNums），然后全部显示 【待完善】！
+
+- 解决方案：因为是要取一个数组【存放页面数字】然后遍历，可以通过在js中新建一个方法，传入【当前页码，总页数，连续显示页数】，通过该方法得到一个数组【存放页面数字】，然后返回给构造导航栏方法，再把之前遍历的数组改为新传入的数组即可（注意js中的除法，使用了下取整Math.floor）
+
+  - 方法
+
+  ```js
+  //mcx:新建
+  //current:当前页，totalPage：总页，navSize：展示页面数
+  function navitage_pages(current,totalPage,navSize){
+      // before = navSize / 2;
+      before = Math.floor(navSize / 2);
+      start = current-before<1 ? 1 : current-before;
+      end = start+navSize-1;
+      if(end>=totalPage){
+          end=totalPage;
+          start=end-navSize+1;
+          if(start<1){
+              start = 1;
+          }
+      }
+  
+      navs=new Array(totalPage<navSize?totalPage:navSize);
+      for(i=start,j=0;i<=end;i++,j++){
+          navs[j]=i;
+      }
+      return navs;
+  }
+  ```
+
+  - 构造导航栏方法前使用新方法得到数组并传入
+
+  ```js
+  //获取新数组
+  var res = navitage_pages(currentpage,totalpagesize,page.navigatePages);
+  
+  //传入新数组res
+  $.each(res, function (index, item) {
+      var li = $("<li></li>").append($("<a>" + item + "</a>").attr("href", "#"));
+      if (currentpage == item) {
+          li.addClass("active");
+      }
+      //点击翻页
+      li.click(function () {
+          $(".pagination>li").removeClass("active");
+          $(this).addClass("active");
+          // to_page(item,action);
+          loadMyReplies(item);
+          return false;
+      })
+      nav.append(li);
+  })
+  ```
+
+- 问题代码：
+
+  - navigatepageNum格式：本质就是一个数组【存放了全部页面的数字】
+
+  ![image-20210407094826781](C:\Users\FX\AppData\Roaming\Typora\typora-user-images\image-20210407094826781.png)
+
+  - js构造导航栏中的遍历生成页码的方法
+
+```html
+ $.each(data.extend.notification.navigatepageNums, function (index, item) {
+    var li = $("<li></li>").append($("<a>" + item + "</a>").attr("href", "#"));
+    if (data.extend.notification.pageNum == item) {
+        li.addClass("active");
+    }
+    //点击翻页
+    li.click(function () {
+        $(".pagination>li").removeClass("active");
+        $(this).addClass("active");
+        // to_page(item,action);
+        loadMyReplies(item);
+        return false;
+    })
+    nav.append(li);
+})
+```
+
+- 待完善，如何使用bootstrap-page.js来自动生成导航栏？！！！
+
+```js
+this.numberOfPages = parseInt(this.options.numberOfPages, 10); //设置要显示的页数
+```
+
+### 12、BuildRepositoryTime（）方法解析
+
+```java
+private void BuildRepositoryTime(List<Repository> repositorys) {
+    for (Repository repository : repositorys) {
+//格式如下
+        Date date = new Date(repository.getGmtCreate());
+        String dateString = simpleDateFormat.format(date);
+        String time = DateFormateUtil.getTime(dateString);
+      
+        repository.setShowTime(time);
+//获取分类名称
+        Integer category = repository.getCategory();
+        String typename = RepositoryCategory.getnameByVal(category);
+        repository.setTypeName(typename);
+    }
+}
+```
+
+
+
+![image-20210407114431061](C:\Users\FX\AppData\Roaming\Typora\typora-user-images\image-20210407114431061.png)
+
+### ==13==、把私人库嵌套在我的主页中
+
+profile.html
+
+```html
+<目前是走直接跳转>
+<li role="presentation"> <a href="/RepositoryList" >我的生活笔记</a></li>  
+
+//mcx:直接跳转
+function loadMyClothAndFood() {
+    $.get("/loadRepositoryList",{"time":new Date()},function (data) {
+        bulid_fans_userList(data);
+    })
+}
+
+$(".nav_list li").click(function () {
+    $(".nav_list li").removeClass("active");
+    $(this).addClass("active");
+    var action= $(this).find("a").attr("id");
+    if(action=="follows"){
+        //加载我的关注
+        loadMyFollows();
+        return;
+    }else if(action=="replies") {
+        //加载我的通知
+        //mcx修改:1
+        loadMyReplies(1);
+        return;
+    } else if(action=="fans") {
+        //加载粉丝？
+        loadMyFans()
+        return;
+    }else if (action =="clothandfood"){
+        loadMyClothAndFood()
+        return;
+    }
+    else{
+        to_page(1, action);
+    }
+})
+```
+
+RepositoryController.java
+
+```java
+-"期望走的方法"
+//这个下面的参数category接收为什么要用String？之后还是要转换为Integer类型
+//ajax加载帖子列表
+@ResponseBody
+@GetMapping("/loadRepositoryList")//mcx:pagesize->35 1 -> 1 ,3
+public ResultTypeDTO listRepository(@RequestParam(name = "sortby", defaultValue = "ALL") String sort,
+                                  @RequestParam(name = "search", required = false) String search,
+                                  @RequestParam(name = "tag", required = false) String tag,
+                                  @RequestParam(name = "pageSize", defaultValue = "35") Integer pageSize,
+                                  @RequestParam(name = "pageNo", defaultValue = "1") Integer pageNo,
+                                  @RequestParam(name = "category", defaultValue = "0") String categoryStrVal,
+                                  HttpServletRequest request) {
+    Integer category = null;
+    User user= (User) request.getSession().getAttribute("user");
+    if(ObjectUtil.isNull(user)){
+        return new ResultTypeDTO().errorOf(RepositoryErrorEnum.REPOSITORY_NEED_LOGIN);
+    }
+    try {
+        category = Integer.parseInt(categoryStrVal);
+    } catch (NumberFormatException e) {
+
+    }
+    RepositoryQueryDTO repositoryQueryDTO = new RepositoryQueryDTO();
+    repositoryQueryDTO.setSearch(search);
+    repositoryQueryDTO.setSort(sort);
+    repositoryQueryDTO.setTag(tag);
+    repositoryQueryDTO.setCategory(category);
+    repositoryQueryDTO.setPageNo(pageNo);
+    repositoryQueryDTO.setPageSize(pageSize);
+    PageInfo<Repository> repositoryPageInfo = repositoryService.getPageBySearch(repositoryQueryDTO);
+    request.getSession().setAttribute("category", category);//全部
+    return new ResultTypeDTO().okOf().addMsg("page", repositoryPageInfo);
+}
+
+
+-"直接跳转走的页面"
+//首页
+@RequestMapping("/RepositoryList")
+public String index(@RequestParam(value = "tag", required = false) String tag,
+                    @RequestParam(value = "search", required = false) String search,
+                    @RequestParam(value = "category", defaultValue = "0") String category,
+                    Map<String, Object> map) {
+    map.put("tag", tag);
+    map.put("search", search);
+    map.put("category", category);
+    map.put("navLi","find");
+    return "repositorylist";
+}
+```
+
+indexdata.js
+
+```js
+//到帖子页第几页
+function to_page(pageno) {
+    $("#no_quetions").css({
+        display:"none",
+    });
+    //加载完成之后,发送请求到服务器,拿到jason数据,构建列表数据
+    var url = "/loadQuestionList";
+    if ($("#category_param").val()==1){
+        window.location.href="/nov";
+    }
+    $.ajax({
+        type: "GET",
+        url: url,
+        data: {
+            "pageNo": pageno,
+            //mcx:"pageSize": 24,->15
+            "pageSize": 16,
+            "tag": $("#tag_param").val(),
+            "search": $("#search_param").val(),
+            "sortby": $("#sortby_param").attr("sortby"),
+            "category": $("#category_param").val(),
+            contentType: "application/json;charset=UTF-8"
+        },
+        beforeSend: function () {
+            //loadingIndex = layer.msg('加载数据~~', {icon: 16});
+            NProgress.start();
+        },
+        success: function (data) {
+            //layer.close(loadingIndex);
+            NProgress.done();
+            if (data.code == "1000") {
+                if(data.extend.page.total>0){
+                    //构建帖子列表信息
+                    build_question_list(data);
+                    //构建分页信息
+                    //build_page_nav(data);
+                    $("#page").bootstrapPaginator({
+                        bootstrapMajorVersion: 4, //对应的bootstrap版本
+                        currentPage: data.extend.page.pageNum, //当前页数
+                        numberOfPages: 5, //每次显示页数
+                        totalPages: data.extend.page.pages, //总页数
+                        shouldShowPage: true, //是否显示该按钮
+                        useBootstrapTooltip: true,
+                        onPageClicked: function(event, originalEvent, type, page) {
+                            to_page(page);
+                        }
+                    });
+
+                }else{
+                    $("#question_wrapper").empty();
+                    $('.page_info-area').empty();
+                    $(".pagination").empty();
+                    $("#no_quetions").css({
+                        display:"block",
+                    });
+                }
+                $("html,body").animate({scrollTop: 0}, 0);//回到顶端
+            } else {
+                layer.msg(data.extend.msg, {time: 2000, icon: 5, shift: 6}, function () {
+                });
+            }
+        }
+    });
+
+}
+```
+
+### 14、私人库没有单独显示，所有用户可见
+
+
+
+
 
 profile.html：主页页面
 
