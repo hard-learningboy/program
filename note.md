@@ -1546,7 +1546,7 @@ this.redisTemplate.expire(key,getRefreshTime(), TimeUnit.SECONDS);
 this.numberOfPages = parseInt(this.options.numberOfPages, 10); //设置要显示的页数
 ```
 
-### 12、BuildRepositoryTime（）方法解析
+### ==12==、BuildRepositoryTime（）方法解析
 
 ```java
 private void BuildRepositoryTime(List<Repository> repositorys) {
@@ -1734,7 +1734,371 @@ function to_page(pageno) {
 }
 ```
 
-### 14、私人库没有单独显示，所有用户可见
+### ==14==、私人库没有单独显示，所有用户可见
+
+- 问题：之前的"我的生活笔记"是直接跳转，跳出个人主页页面，新页面跟首页差不多的布局，【全部、私人日志、私人相册】跟首页名胜景点等导航栏同级，同时展示的是所有用户的日志和相册，不能展示当前登录用户的所有日志和相册
+
+- 需求：点击"我的生活笔记"不跳出我的主页这个布局框，将【全部、私人日志、私人相册】放入到我的生活笔记下，但是这个是动态加入的，只有当点击"我的生活笔记"才会生成并装入；保持之前点哪哪个属性亮（即acitve），作用于==动态生成==的【全部、私人日志、私人相册】，注意这是动态生成的，所以不能直接在准备好时添加.click事件，不生效；仅展示==当前用户==的日志和相册。
+
+- 解决：
+  - profile.html
+
+  ```js
+  //我的主页按钮功能
+  $(".nav_list li").click(function () {
+      $(".nav_list li").removeClass("active");
+      $(this).addClass("active");
+      var action= $(this).find("a").attr("id");
+      if(action=="follows"){
+          //加载我的关注
+          loadMyFollows();
+          return;
+      }else if(action=="replies") {
+          //加载我的通知
+          //mcx修改:1
+          loadMyReplies(1);
+          return;
+      } else if(action=="fans") {
+          //加载粉丝？
+          loadMyFans()
+          return;
+  //修改
+      }else if (action =="repository"){
+          loadMyRepository()
+          return;
+      }
+      else{
+  //加载收藏和帖子
+          to_page(1, action);
+      }
+  })
+  
+  //mcx:直接跳转修改为嵌套在页面中
+  //首次点击时展示
+  function loadMyRepository() {
+      $.get("/loadRepositoryList",{"time":new Date()},function (data) {
+          bulid_repository_list(data);
+      })
+  }
+  
+  //因为是动态生成的，所以不能在准备好的js中添加统一的click事件
+  //这里是每个属性添加一个onclick方法，当点击时进入处理
+  //跳转到“/loadRepositoryList”，获取到查询的数据，执行bulid_repository_list(data,tmp)构建展示页面
+  //构建完页面后，移除已有的active，给新的属性添加active
+  function testa() {
+      $.get("/loadRepositoryList",{"time":new Date(),"sortby":'ALL'},function (data) {
+          bulid_repository_list(data);
+          $("#myTabs li").removeClass("active");
+          $("#ALL").parent().addClass("active");
+      })
+  }
+  function testb() {
+      $.get("/loadRepositoryList",{"time":new Date(),"sortby":'Blog'},function (data) {
+          bulid_repository_list(data);
+          $("#myTabs li").removeClass("active");
+          $("#Blog").parent().addClass("active");
+      })
+  }
+  function testc() {
+      $.get("/loadRepositoryList",{"time":new Date(),"sortby":'Photo'},function (data) {
+          bulid_repository_list(data);
+          $("#myTabs li").removeClass("active");
+          $("#Photo").parent().addClass("active");
+      })
+  }
+  
+  //构建展示页面，生成【全部，私人日志，私人相册】，以及查询出来的数据
+  function bulid_repository_list(data) {//action
+      //清空
+      $("#my_data_wrapper").empty();
+      $('.page_info-area').empty();
+      $(".pagination").empty();
+  
+  //新增！构建导航    
+      var test = $("<ul class=\"nav nav-tabs \" id=\"myTabs\" >\n" +
+          "            <li class=\"active\"><a id=\"ALL\" onclick=\"testa()\">全部</a></li>\n" +
+          "            <li>\n" +
+          "                <a id=\"Blog\" onclick=\"testb()\">私人日记</a>\n" +
+          "            </li>\n" +
+          "            <li>\n" +
+          "                <a id=\"Photo\" onclick=\"testc()\">私人相册</a>\n" +
+          "            </li>");
+      test.appendTo("#my_data_wrapper");
+  
+      var questions = data.extend.page.list;
+      $.each(questions, function (index, item) {
+          var question = $("<div id='question_"+item.id+"'  class=\"question media\">\n" +
+              "  <div class=\"  media-left \">\n" +
+              "    <a href=\"/people?id=" + item.creator + "\">\n" +
+              "      <img style='width: 45px;margin-right: 20px;' class='img-rounded' src=\" " + item.user.avatarUrl + " \" alt=\"...\">\n" +
+              "    </a>\n" +
+              "  </div>\n" +
+              "  <div class=\"media-body\">\n" +
+              "    <a  href='/repository/" + item.id + "' class=\"media-heading question_title\">" + item.title + "</a>\n" +
+              "  <br>  <span style=\"font-size: 12px;\">\n" +
+              "                         <span class='question_type_tag'>" + item.typeName + "</span> • \n" +
+              "                  "+item.user.name+"  •  <span style=\"font-size: 11px;\" class=\"iconfont icon-pinglun1\">" + item.commentCount + "</span>人评论 •\n" +
+              "                     <span><small style='font-size: 11px;' class='iconfont icon-liulan1'></small>" + item.viewCount + "</span>次浏览 •\n" +
+              "                        <span>" + item.likeCount + "</span>人点赞 •\n" +
+              "                        发布于:<spanid=\"publish_time\"><span id='clock' class='iconfont icon-zuijingengxin' ></span>" + item.showTime + "</span>\n" +
+              "            </span>\n" +
+              "    <span style=\"float: right;color: #999999;font-size: 10px !important;\">\n" +
+              "      <small class=\"question_type_right\">" + item.typeName + "</small>\n\n" +
+              "  </div>\n" +
+              "</div>");
+          question.appendTo("#my_data_wrapper");
+  
+      })
+  }
+  ```
+
+- 改进：有个疑惑点！！！
+
+  - 上面中给每个属性加了一个方法，再重写一个点击方法，代码比较多，经过查阅，发现==之前的动态生成只要在调用方法后初始化即可解决==，故做如下修改
+
+  ```js
+  //直接一个方法搞定，在bulid_repository_list(data)后添加事件初始化
+  //麻烦点：如何使属性消除active和增加active，初始化构建时总是ALL是active，所以要在构建完后添加动态增删active，通过点击事件传一个当前的参数【$(this)】,【为什么不能直接在外面获取$(this) ->好像是在事件中点击了才有得到对象，在外面都没有这个事件，当然this也就是window了】，然后从参数中获取a标签的id名，然后加上"#"拼接成id选择器，然后使用$(id选择器).parent。addClass("active") ->因为要使外面的li标签添加属性所以用parent属性，但是这个属性要判断是否存在，再进行操作！，最后才是点击事件，设置"srotby——param"的值，后面查询不同的条件判断
+  
+  <!--查询的信息参数，隐藏-->
+  <input type="hidden" name="sortby" id="sortby_param" th:value="${sortby}">
+  
+  function loadMyRepository(gid) {
+      $.get("/loadRepositoryList",{"time":new Date(),"sortby":$("#sortby_param").attr("sortby")},function (data) {
+          console.log(gid);
+          bulid_repository_list(data);
+  
+          if(gid){
+              var choose = '#' + gid[0].id;
+              $("#myTabs li").removeClass("active");
+              $(choose).parent().addClass("active");
+          }
+          $('#myTabs a').click(function (e) {
+              $("#sortby_param").attr("sortby", this.id);
+              var cid = $(this);
+              loadMyRepository(cid);
+          });
+  
+      })
+  }
+  
+  function bulid_repository_list(data) {//action
+      //清空
+      $("#my_data_wrapper").empty();
+      $('.page_info-area').empty();
+      $(".pagination").empty();
+      
+  //！！！每个属性的点击事件取消了
+      
+      var test = $("<ul class=\"nav nav-tabs \" id=\"myTabs\" >\n" +
+          "            <li class=\"active\"><a id=\"ALL\" >全部</a></li>\n" +
+          "            <li>\n" +
+          "                <a id=\"Blog\" >私人日记</a>\n" +
+          "            </li>\n" +
+          "            <li>\n" +
+          "                <a id=\"Photo\" >私人相册</a>\n" +
+          "            </li>");
+      test.appendTo("#my_data_wrapper");
+  
+      var questions = data.extend.page.list;
+      $.each(questions, function (index, item) {
+          var question = $("<div id='question_"+item.id+"'  class=\"question media\">\n" +
+              "  <div class=\"  media-left \">\n" +
+              "    <a href=\"/people?id=" + item.creator + "\">\n" +
+              "      <img style='width: 45px;margin-right: 20px;' class='img-rounded' src=\" " + item.user.avatarUrl + " \" alt=\"...\">\n" +
+              "    </a>\n" +
+              "  </div>\n" +
+              "  <div class=\"media-body\">\n" +
+              "    <a  href='/repository/" + item.id + "' class=\"media-heading question_title\">" + item.title + "</a>\n" +
+              "  <br>  <span style=\"font-size: 12px;\">\n" +
+              "                         <span class='question_type_tag'>" + item.typeName + "</span> • \n" +
+              "                  "+item.user.name+"  •  <span style=\"font-size: 11px;\" class=\"iconfont icon-pinglun1\">" + item.commentCount + "</span>人评论 •\n" +
+              "                     <span><small style='font-size: 11px;' class='iconfont icon-liulan1'></small>" + item.viewCount + "</span>次浏览 •\n" +
+              "                        <span>" + item.likeCount + "</span>人点赞 •\n" +
+              "                        发布于:<spanid=\"publish_time\"><span id='clock' class='iconfont icon-zuijingengxin' ></span>" + item.showTime + "</span>\n" +
+              "            </span>\n" +
+              "    <span style=\"float: right;color: #999999;font-size: 10px !important;\">\n" +
+              "      <small class=\"question_type_right\">" + item.typeName + "</small>\n\n" +
+              "  </div>\n" +
+              "</div>");
+          question.appendTo("#my_data_wrapper");
+  
+      })
+  }
+  ```
+
+  
+
+
+
+
+
+- 
+
+### ==15==、QuestionExtMapper中的listQuestionWithUserBySearch语句->修改
+
+- 需求：仓库中有3个页面【全部（ALL）、私人日志（Blog）、私人相册（Photo）】，需要点击相应的按钮显示相应的页面并展示，同时按钮的active属性更改
+- 具体：
+  - ①点击"我的生活笔记"，自动到"全部"，属性active，同时展示==该用户==的==所有日志和相册==（！该用户）
+  - ②点击"私人日志"，消除之前的active，Blog属性增加active，同时展示==该用户==的==所有日志==
+  - ③点击"私人相册"，消除之前的active，Photo属性增加active，同时展示==该用户==的==所有相册==
+  - ④跳转回"全部"，消除之前的active,ALL属性增加active，同时展示该用户的所有日志和相册
+- 原先：
+  - ①RepositoryExtMapper.xml
+
+```xml
+<"原先">
+<select id="listRepositoryWithUserBySearch" resultMap="repository_user_map"
+        resultType="com.zhangyu.coderman.modal.Repository">
+    SELECT q.id qid, q.title,q.gmt_create qct ,q.gmt_modified
+    qmt,tag,q.creator,q.view_count,q.like_count,q.comment_count,q.category
+    ,u.id uid,u.account_id account,u.name,u.token,
+    u.gmt_create uct,u.gmt_modified umt,u.avatar_url,u.bio,u.location,u.company
+    FROM repository q ,user u
+    <where>
+        q.creator=u.id
+        <if test="category!=null and category!=''">
+            and category = #{category}
+        </if>
+        <if test="search!=null and search!=''">
+            and title regexp #{search}
+        </if>
+        <if test="tag!=null and tag!=''">
+            and tag regexp #{tag}
+        </if>
+        <if test="userId!=null and userId!=''">
+            and tag regexp #{userId}
+        </if>
+        ORDER by qct DESC
+    </where>
+</select>
+```
+
+- 解决：
+
+  - ①RepositoryExtMapper.xml：修改了userId里面的tag ->应该改为creator
+
+  ```xml
+  <select id="listRepositoryWithUserBySearch" resultMap="repository_user_map"
+          resultType="com.zhangyu.coderman.modal.Repository">
+      SELECT q.id qid, q.title,q.gmt_create qct ,q.gmt_modified
+      qmt,tag,q.creator,q.view_count,q.like_count,q.comment_count,q.category
+      ,u.id uid,u.account_id account,u.name,u.token,
+      u.gmt_create uct,u.gmt_modified umt,u.avatar_url,u.bio,u.location,u.company
+      FROM repository q ,user u
+      <where>
+          q.creator=u.id
+          <if test="category!=null and category!=''">
+              and category = #{category}
+          </if>
+          <if test="search!=null and search!=''">
+              and title regexp #{search}
+          </if>
+          <if test="tag!=null and tag!=''">
+              and tag regexp #{tag}
+          </if>
+          <if test="userId!=null and userId!=''">
+              and creator regexp #{userId}
+          </if>
+          ORDER by qct DESC
+      </where>
+  
+  </select>
+  ```
+
+  
+
+  - RepositoryController.java
+
+  ```java
+  @ResponseBody
+  @GetMapping("/loadRepositoryList")//mcx:pagesize->35 1 -> 1 ,3
+  public ResultTypeDTO listRepository(@RequestParam(name = "sortby", defaultValue = "ALL") String sort,
+                                    @RequestParam(name = "search", required = false) String search,
+                                    @RequestParam(name = "tag", required = false) String tag,
+                                    @RequestParam(name = "pageSize", defaultValue = "35") Integer pageSize,
+                                    @RequestParam(name = "pageNo", defaultValue = "1") Integer pageNo,
+                                    @RequestParam(name = "category", defaultValue = "0") String categoryStrVal,
+                                    HttpServletRequest request) {
+      Integer category = null;
+      User user= (User) request.getSession().getAttribute("user");
+      if(ObjectUtil.isNull(user)){
+          return new ResultTypeDTO().errorOf(RepositoryErrorEnum.REPOSITORY_NEED_LOGIN);
+      }
+      try {
+          category = Integer.parseInt(categoryStrVal);
+      } catch (NumberFormatException e) {
+  
+      }
+      RepositoryQueryDTO repositoryQueryDTO = new RepositoryQueryDTO();
+      repositoryQueryDTO.setSearch(search);
+      repositoryQueryDTO.setSort(sort);
+      repositoryQueryDTO.setTag(tag);
+      repositoryQueryDTO.setPageNo(pageNo);
+      repositoryQueryDTO.setPageSize(pageSize);
+  
+  //mcx:设置userId，方便后续进入查询时只显示该用户的日志和相册
+      repositoryQueryDTO.setUserId(user.getId());
+  //mcx:修改里面的方法
+      PageInfo<Repository> repositoryPageInfo = repositoryService.getPageBySearch(repositoryQueryDTO);
+  
+      request.getSession().setAttribute("category", category);//全部
+      return new ResultTypeDTO().okOf().addMsg("page", repositoryPageInfo);
+  }
+  ```
+
+  - RepositoryServiceImpl.java
+
+  ```java
+  @Override
+  public PageInfo<Repository> getPageBySearch(RepositoryQueryDTO repositoryQueryDTO) {
+      List<Repository> list=new ArrayList<>();
+      PageInfo<Repository> repositoryPageInfo;
+      PageHelper.startPage(repositoryQueryDTO.getPageNo(),repositoryQueryDTO.getPageSize());
+      String sortType=repositoryQueryDTO.getSort();
+  
+      if ("ALL".equals(sortType)){
+  //全部
+  //userid已经在进入方法时传入,类别参数默认为所有
+          list = repositoryExtMapper.listRepositoryWithUserBySearch(repositoryQueryDTO);
+     }else if ("Blog".equals(sortType)){
+  //日志
+  //设置类别参数为1，只显示私人日志，userid已经在进入方法时传入了，无需再传
+          repositoryQueryDTO.setCategory(1);
+          list = repositoryExtMapper.listRepositoryWithUserBySearch(repositoryQueryDTO);
+  
+      }else if ("Photo".equals(sortType)){
+  //相册
+  //设置类别参数为2，只显示私人相册，userid已经在进入方法时传入了，无需再传
+          repositoryQueryDTO.setCategory(2);
+          list = repositoryExtMapper.listRepositoryWithUserBySearch(repositoryQueryDTO);
+      }
+  
+  //时间格式化,typename
+      BuildRepositoryTime(list);
+      repositoryPageInfo = new PageInfo<>(list);
+      repositoryPageInfo.setNavigatePages(5);
+      return repositoryPageInfo;
+  }
+  
+  private void BuildRepositoryTime(List<Repository> repositorys) {
+      for (Repository repository : repositorys) {
+          Date date = new Date(repository.getGmtCreate());
+          String dateString = simpleDateFormat.format(date);
+          String time = DateFormateUtil.getTime(dateString);
+  //修改时间显示      
+          repository.setShowTime(time);
+  //获取类名
+          Integer category = repository.getCategory();
+          String typename = RepositoryCategory.getnameByVal(category);
+          repository.setTypeName(typename);
+      }
+  }
+  ```
+
+  - 
+
+
 
 
 
@@ -2316,3 +2680,122 @@ function bulid_MyReplies_List(data) {
 }
 ```
 
+## 项目外拓展
+
+### 1、Jquery
+
+#### 1）在js中添加html代码
+
+- 用一个变量存储html语句，然后$(选择器).html：新建，$().append：追加
+
+```js
+//定义一个变量存html语句，注意格式
+var test1 = "<row class=\"tab-content\" >\n" +
+    "    <div class=\"tab-pane active\" id=\"home\">1111</div>\n" +
+    "    <div class=\"tab-pane\" id=\"profile\">22222</div>\n" +
+    "    <div class=\"tab-pane\" id=\"messages\">33333</div>\n" +
+    "    <div class=\"tab-pane\" id=\"settings\">44444</div>\n" +
+    "</row>";
+//$().html：新建  |  $().append：追加
+$("#my_data_wrapper").html(test1);
+$("#my_data_wrapper").append(test1);
+
+```
+
+#### 2）动态生成的html语句 初始化事件指令
+
+- 动态生成的html中如果包含事件命令等，因为没法在刚进页面时就生成，所以不能在页面加载完初始化指令，这样无作用，现在的解决方法是==在生成的语句后面加上初始化指令==
+- 例：
+
+```js
+$(".nav_list li").click(function () {
+    $(".nav_list li").removeClass("active");
+    $(this).addClass("active");
+    var action= $(this).find("a").attr("id");
+    console.log(action);
+    if(action=="collects"){
+        build_collects();
+//！！！在生成之后增加的初始化指令
+        $('#myTab a').click(function (e) {
+            // e.preventDefault();
+            console.log("jinlaile");
+            $(this).tab('show');
+        })
+        return;
+    }else if(action=="replies") {
+        build_replies();
+//！！！在生成之后增加的初始化指令
+        $('#myTab a').click(function (e) {
+            $(this).tab('show');
+        })
+        return;
+    }else{
+        return;
+    }
+}
+                        
+function build_collects() {
+//清空之前的东西
+    $("#my_data_wrapper").empty();
+    var test = "<ul class=\"nav nav-tabs\" id=\"myTab\">\n" +
+        "    <li class=\"active\"><a href=\"#home\">首页</a></li>\n" +
+        "    <li><a href=\"#profile\">介绍</a></li>\n" +
+        "    <li><a href=\"#messages\">消息</a></li>\n" +
+        "    <li><a href=\"#settings\">设置</a></li>\n" +
+        "</ul>";
+    $("#my_data_wrapper").append(test);
+    var test1 = "<row class=\"tab-content\" >\n" +
+        "    <div class=\"tab-pane active\" id=\"home\">1111</div>\n" +
+        "    <div class=\"tab-pane\" id=\"profile\">22222</div>\n" +
+        "    <div class=\"tab-pane\" id=\"messages\">33333</div>\n" +
+        "    <div class=\"tab-pane\" id=\"settings\">44444</div>\n" +
+        "</row>";
+    $("#my_data_wrapper").append(test1);
+}
+
+function build_replies() {
+    $("#my_data_wrapper").empty();
+    var test = "<ul class=\"nav nav-tabs\" id=\"myTab\">\n" +
+        "    <li class=\"active\"><a href=\"#home\">首页2</a></li>\n" +
+        "    <li><a href=\"#profile\">介绍2</a></li>\n" +
+        "    <li><a href=\"#messages\">消息2</a></li>\n" +
+        "    <li><a href=\"#settings\">设置2</a></li>\n" +
+        "</ul>";
+    $("#my_data_wrapper").append(test);
+    var test1 = "<row class=\"tab-content\" >\n" +
+        "    <div class=\"tab-pane active\" id=\"home\">1111</div>\n" +
+        "    <div class=\"tab-pane\" id=\"profile\">22222</div>\n" +
+        "    <div class=\"tab-pane\" id=\"messages\">33333</div>\n" +
+        "    <div class=\"tab-pane\" id=\"settings\">44444</div>\n" +
+        "</row>";
+    $("#my_data_wrapper").append(test1);
+}
+```
+
+#### 3）bootstrap：tab标签切换
+
+- 参考：https://blog.csdn.net/shiquanqq/article/details/48786701
+
+#### 4）正确取值
+
+- 第一次加载的时候参数为空，所以不存在，不能直接取，要先判断存在，再gid[0].id
+
+```js
+function loadMyRepository(gid) {
+    if(gid){
+        var choose = '#' + gid[0].id;
+    }
+}
+```
+
+
+
+![image-20210408165507161](C:\Users\FX\AppData\Roaming\Typora\typora-user-images\image-20210408165507161.png)
+
+![image-20210408165520424](C:\Users\FX\AppData\Roaming\Typora\typora-user-images\image-20210408165520424.png)
+
+### 2、Thymeleaf
+
+```js
+th:onclick="'javascript:maket(\''+${people.name}+'\')'"
+```
